@@ -1,11 +1,10 @@
 {
   "name": "wp-configurator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Helper for creating and extending Webpack configuration structures.",
   "main": "index.js",
   "scripts": {
-    "test": "node_modules/.bin/mocha",
-    "test:watch": "node_modules/.bin/mocha --watch"
+    "test": "node_modules/.bin/mocha"
   },
   "keywords": [
     "webpack",
@@ -15,10 +14,10 @@
     "loaders",
     "plugins"
   ],
-  "author": "Lewis Barnes",
+  "author": "Luke Sheard",
   "repository": {
     "type": "git",
-    "url": "http://github.com/lewie9021/webpack-configurator"
+    "url": "http://github.com/LukeSheard/wp-configurator"
   },
   "license": "MIT",
   "dependencies": {
