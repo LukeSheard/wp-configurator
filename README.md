@@ -1,18 +1,10 @@
 # Webpack Configurator
 
-## Notice
-
-In the coming weeks, this module will hit v1.0.0! These changes are quite significant, causing a number of **breaking changes** in comparison to the current API. For a preview of the upcoming changes, see the [v1.0.0 branch](https://github.com/lewie9021/webpack-configurator/tree/1.0.0). Feedback is much appreciated!
-
 ## Install
 
 ```
-$ npm install webpack-configurator
+$ npm install wp-configurator
 ```
-
-## Motivation
-
-In a number of my old projects, I found it difficult to DRY up the configuration files. My setup often contained a number of build modes (e.g. dev, test, and production), each sharing similar parts to one another. These common chunks were placed in a 'base' build mode. I wanted to still maintain the flexibility of including build mode specific configuration, while at the same time making slight changes to things such as loader query strings. In the end, I still found that my build mode files contained repetitive boilerplate code that I really wanted to avoid.
 
 ## API
 
