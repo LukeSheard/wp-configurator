@@ -5,7 +5,15 @@ var Plugins = require("./lib/plugins");
 var Utilities = require("./lib/utilities");
 var Helpers = require("./lib/helpers");
 
-module.exports = {
+exports.loader = Loader;
+exports.loaders = Loaders;
+exports.plugin = Plugin;
+exports.plguins = Plugins;
+exports.merge = Utilities.merge;
+exports.resolveAll = Utilities.resolveAll;
+exports.helpers = Helpers;
+
+module.exports = module.exports.default = {
     loader: Loader,
     loaders: Loaders,
     plugin: Plugin,
