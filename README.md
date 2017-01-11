@@ -8,7 +8,7 @@ In the coming weeks, this module will hit v1.0.0! These changes are quite signif
 
 ```
 $ npm install webpack-configurator
-````
+```
 
 ## Motivation
 
@@ -16,219 +16,400 @@ In a number of my old projects, I found it difficult to DRY up the configuration
 
 ## API
 
-### config.merge(config)
+* [Top-Level Exports](#top-level-exports)
+  * [loader](#loaderconfig)
+  * [loaders](#loadersconfigs)
+  * [plugin](#pluginconfig)
+  * [plugins](#pluginsconfigs)
+  * [merge](#mergeobject-source-customizer)
+  * [resolveAll](#resolveallwrappers)
+  * [helpers](#helpers)
+* [Loader](#loader)
+  * [merge](#loadermergeproperty-changes-customizer)
+  * [set](#loadersetproperty-changes)
+  * [get](#loaderget)
+  * [resolve](#loaderresolve)
+* [Plugin](#plugin)
+  * [merge](#pluginmergeindex-changes)
+  * [set](#pluginsetindex-changes)
+  * [get](#pluginget)
+  * [resolve](#pluginresolve)
+* [Helpers](#helpers-1)
+  * [concatMerge](#concatmerge)
 
-<!-- Description of why you might want to use this method. -->
+### Top-Level Exports
 
-**Arguments**
-
-1. `config` *(Object|Function)*: If an object is passed, this will be merged with the current value of config._config using the default way of merging (concat arrays nested within the data structure). If a function is passed, the first parameter will be a copy of the value contained within config._config. You can then make all the necessary changes to the data structure before returning the new value.
-
-**Returns**
-
-*`(Object)`*: The config object to allow function chaining.
-
-**Example**
+Below is a list of properties that are accessible at the top level of the module. Simply require the module into your script:
 
 ```javascript
-// Config as an object.
-config.merge({
-     entry: "./app.entry.js"
-});
-
-// Config as a function.
-config.merge(function(current) {
-    current.entry = "./app.entry.js";
-
-    return current;
-});
+// Note: I use Pascal case when referencing external modules.
+var Config = require("webpack-configurator");
 ```
 
-### config.loader(key, config, resolver)
+#### loader(config)
 
-Provides a way of adding loaders to the config. You can add two other types of loaders using `config.preLoader` and `config.postLoader`.
+Complex configurations often modify the properties of loaders. This utility helps aid composabilty by providing a number of methods that cater to common use cases. The example below shows how to construct a loader:
 
-**Arguments**
-
-1. `key` *(String)*: Name of the loader. This is used to differentiate between loaders when merging/extending. When resolving, this value is used as a fallback for the 'loader' property value.
-2. `config` *(Object|Function)*: If an object is passed, this will be merged with the current value of the loader's config using the default way of merging (concat arrays nested within the data structure). If a function is passed, the first parameter will be a copy of the loader's config. You can then make all the necessary changes to the data structure before returning the new value.
-3. `resolver` *(Function)*: This works in a similar way to the `config` parameter, however, it is only called when resolving. It provides an opportunity to make final changes once the configuration is has been completely merged. **Note**: If the loader already has a resolver, the value will simply get replaced.
-
-**Returns**
-
-*`(Object)`*: The config object to allow function chaining.
-
-**Examples**
-
-Config as an object.
 ```javascript
-config.loader("dustjs-linkedin", {
-    test: /\.dust$/
-});
-```
-
-Config as a function.
-```javascript
-config.loader("dustjs-linkedin", function(current) {
-    current.test = /\.dust$/;
-    
-    return current;
-});
-```
-
-Config as an object with a resolver function.
-```javascript
-var ExtractTextPlugin = require('extract-text-webpack-plugin');
-
-config.loader("sass", {
-    test: /\.scss$/,
-    queries: {
-        css: {
-            sourceMap: true
-        },
-        sass: {
-            sourceMap: true
-        }
+// The contents of 'babel' is a loader object wrapper.
+var babel = Config.loader({
+    test: /\.jsx?/,
+    loader: "babel",
+    query: {
+        presets: ["es2015"]
     }
-}, function(config) {
-    var loaders = [];
-
-    for (var key in config.queries)
-        loaders.push(key + "?" + JSON.stringify(config.queries[key]));
-
-    config.loader = ExtractTextPlugin.extract(loaders.join("!"));
-
-    return config;
-});
-```
-<!--- An example of how merging works. -->
-
-### config.removeLoader(key)
-
-Provides a way to remove loaders without directly modifying internal data structures on the instance. You can remove two other types of loaders using the following: `config.removePreLoader(key)` and `config.removePostLoader(key)`.
-
-**Arguments**
-
-1. `key` *(String)*: Name of the loader you wish to remove. This is the same value used when calling the 'loader' method.
-
-**Returns**
-
-*`(Object)`*: The config object to allow function chaining.
-
-**Example**
-
-```javascript
-// Create a loader with the key 'dustjs-linkedin'
-config.loader("dustjs-linkedin", {
-    test: /\.dust$/
-});
-
-// Remove the loader using the same key as above.
-config.removeLoader("dustjs-linkedin");
-```
-
-### config.plugin(key, constructor, parameters)
-
-<!-- Description of why you might want to use this method. -->
-
-**Arguments**
-
-1. `key` *(String)*: Name of the plugin. This is used to differentiate between plugins when merging/extending.
-2. `constructor` *(Class)*: The class constructor that you wish to be instantiated when resolving. **Note**: If the plugin already has a constructor, the value will simply get replaced. You may merge/extend `parameters` by passing null for this parameter.
-3. `parameters` *(Array|Function)*: If an array is passed, this will be merged with the current value of the plugin's parameters using the default way of merging (concat arrays nested within the data structure). If a function is passed, the first parameter will be a copy of the plugin's parameters array. You can then make all the necessary changes to the data structure before returning the new value. **Note** This must be an array.
-
-**Returns**
-
-*`(Object)`*: The config object to allow function chaining.
-
-**Examples**
-
-Parameters as an array.
-```javascript
-var Webpack = require("webpack");
-
-config.plugin("webpack-define", Webpack.DefinePlugin, [{
-    __DEV__: true
-}]);
-```
-
-Parameters as a function.
-```javascript
-var Webpack = require("webpack");
-
-config.plugin("webpack-define", Webpack.DefinePlugin, function(current) {
-    return [{
-        __DEV__: true
-    }];
 });
 ```
 
-### config.removePlugin(key)
+#### loaders(configs)
 
-<!-- Description of why you might want to use this method. -->
+It's common to find configurations with multiple loaders. This utility provides a way to define several loaders at once, returning an array of loader object wrappers. Below is an example of its usage:
 
-**Arguments**
+```javascript
+var loaders = Config.loaders([
+    {
+        test: /\.jsx?/,
+        loader: "babel",
+        query: {
+            presets: ["es2015"]
+        }
+    },
+    {
+        test: /\.scss$/,
+        loaders: ["style", "css", "sass"]
+    }
+]);
+```
 
-1. `key` *(String)*: Name of the plugin you wish to remove. This is the same value used when calling the 'plugin' method.
+#### plugin(config)
 
-**Returns**
-
-*`(Object)`*: The config object to allow function chaining.
-
-**Example**
+It's sometimes difficult to customise plugins because of the way they differ from loaders. This utility makes it easier by splitting out the parameters. The plugin isn't created until the `resolve` method is called. Below is an example of its usage:
 
 ```javascript
 var Webpack = require("webpack");
 
-// Create a plugin with the key 'webpack-define'.
-config.plugin("webpack-define", Webpack.DefinePlugin, [{
-    __DEV__: true
-}]);
-
-// Remove the plugin using the same key as above.
-config.removePlugin("webpack-define");
+var webpackDefine = Config.plugin({
+    plugin: Webpack.DefinePlugin,
+    parameters: [{
+        VERSION: JSON.stringify("1.0.1"),
+    }]
+});
 ```
 
-<!-- Show how it's more useful when extending... -->
+#### plugins(configs)
 
-### config.resolve()
+You may wish to define several plugins at once. This utility accepts an array of plugin configurations and returns an array of plugin object wrappers. Below is an example of its usage:
 
-Call when you want to return a complete Webpack configuration object, typically at the end. It can be called numerous times since it doesn't produce any side effects.
+```javascript
+var Webpack = require("webpack");
 
-**Returns**
+var plugins = Config.plugins([
+    {
+        plugin: Webpack.DefinePlugin,
+        parameters: [{
+            VERSION: JSON.stringify("1.0.1")
+        }]
+    },
+    {
+        plugin: Webpack.UglifyJsPlugin,
+        parameters: [{
+            compress: {
+                warnings: false
+            }
+        }]
+    }
+]);
+```
 
-*`(Object)`*: A valid Webpack configuration object
+#### merge(object, source, [customizer])
 
-**Examples**
+A generalised merge utility. It works in a similar way to loader.merge and plugin.merge, only this function has no validation on properties.
 
-A simple webpack.config.js file demonstrating the module's use.
+```javascript
+var base = {
+    entry: "./base.entry.js",
+    output: {
+        filename: "bundle.js"
+    }
+};
+
+module.exports = Config.merge(base, {
+    devtool: "source-map",
+    entry: "./dev.entry.js",
+});
+```
+
+#### resolveAll(wrappers)
+
+Useful when a configuration has several loaders or plugins. Each loader and plugin has a `resolve` method. This utility will call said method and return an array of resolved values.
+
+```javascript
+var loaders = Config.loaders([
+    {
+        test: /\.jsx?$/,
+        loader: "babel"
+    },
+    {
+        test: /\.scss$/,
+        loaders: ["style", "css", "sass"]
+    }
+]);
+
+module.exports = {
+    entry: "./base.entry.js",
+    output: {
+        filename: "bundle.js"
+    },
+    module: {
+        loaders: Config.resolveAll(loaders)
+    }
+};
+```
+
+#### helpers
+
+This object contains miscellaneous functions that help resolve common problems when creating Webpack configurations. Right now, there is only one helper available 'concatMerge'. However, this number will likely increase in the future.
+
+### Loader
+
+<!---
+Note: all methods are chainable.
+-->
+
+#### loader.merge([property], changes, [customizer])
+
+<!---
+http://webpack.github.io/docs/configuration.html#module-loaders
+Default valid properties:
+- test [Regex]
+- exclude [Regex]
+- include [Regex]
+- loader [String]
+- loaders [Array -> String]
+
+Additional valid properties:
+- query [Object]
+- queries [Object -> Object]
+
+Property constraints:
+- loader -> query
+- loaders -> queries
+-->
+
+Basic example:
+```javascript
+babel.merge({
+    query: {
+        presets: ["es2015", "react"]
+    }
+});
+```
+
+Property specific example:
+```javascript
+babel.merge("query", {
+    presets: ["es2015", "react"]
+});
+```
+
+Function example:
+```javascript
+babel.merge("query", function(config) {
+    var presets = config.query.presets;
+
+    return {
+        presets: presets.concat(["react"])
+    };
+});
+```
+
+Resolve merge example:
+```javascript
+babel.merge("loaders", function(config, loader) {
+    var resolved = loader.resolve();
+
+    return ExtractTextPlugin.extract(resolved.loaders);
+});
+```
+
+Define merge behaviour example:
+```javascript
+babel.merge("query", {
+    presets: ["react"]
+}, Config.helpers.concatMerge);
+```
+
+#### loader.set([property], changes)
+
+<!---
+http://webpack.github.io/docs/configuration.html#module-loaders
+Default valid properties:
+- test [Regex]
+- exclude [Regex]
+- include [Regex]
+- loader [String]
+- loaders [Array -> String]
+
+Additional valid properties:
+- query [Object]
+- queries [Object -> Object]
+
+Property constraints:
+- loader -> query
+- loaders -> queries
+-->
+
+Basic example:
+```javascript
+babel.set({
+    query: {
+        presets: ["es2015", "react"]
+    }
+});
+```
+
+Property specific example:
+```javascript
+babel.set("query", {
+    presets: ["es2015", "react"]
+});
+```
+
+Resolve set example:
 ```javascript
 var Config = require("webpack-configurator");
-var Webpack = require("webpack");
+var ExtractTextPlugin = require("extract-text-webpack-plugin");
 
-module.exports = (function() {
-    var config = new Config();
+var sass = Config.loader({
+    test: /\.scss$/,
+    loaders: ["style", "css", "sass"],
+    queries: {
+        css: {sourceMap: true},
+        sass: {sourceMap: true}
+    }
+});
 
-    config.merge({
-        entry: "./main.js",
-        output: {
-            filename: "bundle.js"       
-        }
-    });
+sass.set("loaders", function(config, loader) {
+    var resolved = loader.resolve();
 
-    config.loader("dustjs-linkedin", {
-        test: /\.dust$/
-    });
+    return ExtractTextPlugin.extract(resolved.loaders);
+});
+```
 
-    config.loader("sass", {
-        test: /\.scss$/,
-        loader: "style!css!sass?indentedSyntax"
-    });
+#### loader.resolve()
 
-    config.plugin("webpack-define", Webpack.DefinePlugin, [{
-        VERSION: "1.0.0"
-    }]);
+<!---
+http://webpack.github.io/docs/configuration.html#module-loaders
+Can only return the following properties (note: either 'loader' and 'loaders'):
+- test [Regex]
+- exclude [Regex]
+- include [Regex]
+- loader [String]
+- loaders [Array -> String]
 
-    return config.resolve();
-})();
+Minimum requirements for a loader:
+- test [Regex]
+- loader [String] | loaders [Array -> String]
+-->
+
+### Plugin
+
+<!---
+Note: all methods are chainable.
+-->
+
+#### plugin.merge([index], changes)
+
+Basic example:
+```javascript
+webpackDefine.merge([{
+    TWO: "1+1"
+}]);
+```
+
+Property specific example:
+```javascript
+webpackDefine.merge(0, {
+    TWO: "1+1"
+});
+```
+
+Another property specific example:
+```javascript
+webpackDefine.merge({
+    0: {TWO: "1+1"}
+});
+```
+
+#### plugin.set([index], changes)
+
+Basic example:
+```javascript
+webpackDefine.set([{
+    TWO: "1+1"
+}]);
+```
+
+Property specific example:
+```javascript
+webpackDefine.set(0, {
+    TWO: "1+1"
+});
+```
+
+Another property specific example:
+```javascript
+webpackDefine.set({
+    0: {TWO: "1+1"}
+});
+```
+
+#### plugin.resolve()
+
+<!---
+Essentially does: return new Plugin(...parameters);
+-->
+
+### Helpers
+
+#### concatMerge
+
+By default, merges will overwrite arrays. This helper provides a simple implementation that overrides said behaviour.
+
+Basic example:
+
+```javascript
+var Config = require("webpack-configurator");
+
+var helpers = Config.helpers;
+var sass = Config.loader({
+    test: /\.scss$/,
+    loaders: ["style", "css"]
+});
+
+sass.merge({
+    loaders: ["sass"]
+}, helpers.concatMerge());
+```
+
+Prepend example:
+
+```javascript
+var Config = require("webpack-configurator");
+
+var helpers = Config.helpers;
+var base = {
+    entry: [
+        "./main.js"
+    ],
+    output: {
+        filename: "bundle.js"
+    }
+};
+
+module.exports = Config.merge(base, {
+    entry: [
+        "webpack-dev-server/client?http://localhost:8080"
+    ]
+}, helpers.concatMerge(true));
 ```

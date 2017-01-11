@@ -1,173 +1,440 @@
 var Webpack = require("webpack");
-var expect = require("chai").expect;
+var Chai = require("chai");
+var Types = require("./helpers/types");
 var Config = require("../");
 
-describe("plugin", function() {
+var expect = Chai.expect;
+var types = Types();
 
-    beforeEach(function() {
-        this.config = new Config();
-    });
+describe("Plugin:", function() {
 
-    it("should require a name (that's a string) to enable referencing when merging", function() {
-        var config = this.config;
-        var invalid = [5, function() {}, [], null, undefined, {}];
+    describe("merge", function() {
 
-        invalid.forEach(function(invalidParameter) {
-            expect(function() {
-                config.plugin(invalidParameter);
-            }).to.throw("Invalid 'name' parameter. You must provide a string.");
-        });
-        
-        expect(function() {
-            config.plugin("my-plugin", function() {});
-        }).to.not.throw();
-    });
-
-    it("should accept a constructor that's either a function or null", function() {
-        var config = this.config;
-        var valid = [function() {}, null];
-        var invalid = ["", [], {}, true, false, 5, undefined];
-        
-        valid.forEach(function(validParameter) {
-            expect(function() {
-                config.plugin("my-plugin", validParameter);
-            }).not.to.throw();
-        });
-        
-        invalid.forEach(function(invalidParameter) {
-            expect(function() {
-                config.plugin("my-plugin", invalidParameter);
-            }).to.throw("Invalid 'constructor' parameter. You must provide either a function or null.");
-        });
-    });
-    
-    it("should accept an optional 'parameters' argument that's either a function or an array", function() {
-        var config = this.config;
-        var constructor = function() {};
-        var valid = [function() { return []; }, [], "", null, undefined, false];
-        var invalid = ["test", {}, true, 5];
-        
-        valid.forEach(function(validParameter) {
-            expect(function() {
-                config.plugin("my-plugin", constructor, validParameter);
-            }).not.to.throw();
-        });
-        
-        invalid.forEach(function(invalidParameter) {
-            expect(function() {
-                config.plugin("my-plugin", constructor, invalidParameter);
-            }).to.throw("The optional 'parameters' argument must be an array or a function.");
-        });
-    });
-
-    it("should throw if 'parameters' is passed a function that doesn't return an array", function() {
-        var config = this.config;
-        var constructor = function() {};
-        var invalid = ["", {}, true, 5, null, undefined, false, function() {}];
-
-        expect(function() {
-            config.plugin("my-plugin", constructor, function() {
-                return [];
+        it("merges parameters, given an array for 'changes'", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
             });
-        }).to.not.throw();
-        
-        invalid.forEach(function(invalidReturnValue, i) {
-            expect(function() {
-                config.plugin("my-plugin", constructor, function() {
-                    return invalidReturnValue;
-                });
-            }).to.throw("The 'parameters' argument must return an array.");
-        });
-    });
 
-    it("should enable function chaining by returning the config instance", function() {
-        var config = this.config.plugin("my-plugin", function() {});
+            plugin.merge([{b: 2}, 3, "merge"]);
 
-        // Reference equality.
-        expect(config).to.eq(this.config);
-    });
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1, b: 2}, 3, "merge"]
+            };
 
-    it("should create a 'plugins' array property on the resolved config object", function() {
-        var result;
-        
-        this.config.plugin("my-plugin", function() {});
-
-        result = this.config.resolve();
-
-        expect(result).to.have.property("plugins");
-        expect(result.plugins).to.be.an.instanceof(Array);
-        expect(result.plugins.length).to.eq(1);
-    });
-
-    it("should not throw if no parameters are passed", function() {
-        var config = this.config;
-
-        expect(function() {
-            config
-                .plugin("my-plugin", function() {})
-                .resolve();
-        }).to.not.throw();
-    });
-
-    it("should throw when resolving a plugin that has a null constuctor value", function() {
-        var config = this.config;
-        var config2 = new Config();
-        
-        expect(function() {
-            config
-                .plugin("my-plugin", null)
-                .resolve();
-        }).to.throw("Failed to resolve 'my-plugin'. Expected constructor not to be null.");
-
-        // Ensure the error message is dynamic.
-        expect(function() {
-            config2
-                .plugin("another-plugin", null)
-                .resolve();
-        }).to.throw("Failed to resolve 'another-plugin'. Expected constructor not to be null.");
-    });
-    
-    describe("examples", function() {
-        
-        it("should successfully create a simple plugin", function() {
-            var DefinePlugin = Webpack.DefinePlugin;
-            var result;
-
-            this.config.plugin("webpack-define", DefinePlugin, [{
-                VERSION: "1.0.0"
-            }]);
-            
-            result = this.config.resolve();
-
-            expect(result.plugins[0]).to.be.instanceof(DefinePlugin);
-            expect(result.plugins[0]).to.eql(new DefinePlugin({
-                VERSION: "1.0.0"
-            }));
+            expect(actual).to.eql(expected);
         });
 
-        it("should allow parameters to be modified after initial definition", function() {
-            var DefinePlugin = Webpack.DefinePlugin;
-            var result;
+        it("merges parameters at specific indexes, given a 'changes' object with numerical keys", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
 
-            this.config
-                .plugin("webpack-define", DefinePlugin, [{
-                    VERSION: "1.0.0"
-                }])
-                .plugin("webpack-define", null, function(current) {
-                    current[0].APP_NAME = "My App";
+            plugin.merge({
+                0: {b: 2},
+                2: {c: 3}
+            });
 
-                    return current;
-                });
-            
-            result = this.config.resolve();
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1, b: 2}, 5, {c: 3}]
+            };
 
-            expect(result.plugins[0]).to.be.instanceof(DefinePlugin);
-            expect(result.plugins[0]).to.eql(new DefinePlugin({
-                VERSION: "1.0.0",
-                APP_NAME: "My App"
-            }));
+            expect(actual).to.eql(expected);
         });
 
+        it("throws if a 'changes' object is passed with non-numerical keys", function() {
+            var error = "You must provide numerical keys when defining 'changes' as an object.";
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "int")
+                    return;
+
+                var key = types[type];
+                var changes = {};
+
+                changes[key] = "test";
+
+                expect(function() {
+                    plugin.merge(changes);
+                }).to.throw(error);
+            });
+        });
+
+        it("fills empty parameter indexes with 'undefined', given out of range keys", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5]
+            });
+
+            plugin.merge({
+                0: {b: 2},
+                4: "test"
+            });
+
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1, b: 2}, 5, undefined, undefined, "test"]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("throws if 'changes' isn't an object or array", function() {
+            var error = "You must provide either an object or array for 'changes'.";
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "object" || type == "array")
+                    return;
+
+                expect(function() {
+                    plugin.merge(types[type]);
+                }).to.throw(error);
+            });
+        });
+
+        it("accepts a function who's return value is merged with the plugin's parameters", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            plugin.merge(function(parameters) {
+                return [{b: 2}, 3, "merge"];
+            });
+
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1, b: 2}, 3, "merge"]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("provides a reference to the current parameters and plugin, given a function", function() {
+            var define = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            // Call the merge method with just 'changes'.
+            define.merge(function(parameters, plugin) {
+                expect(parameters).to.eql(define.get().parameters);
+                expect(plugin).to.eq(define);
+
+                return parameters;
+            });
+
+            // Call the merge method with 'index' and 'changes'.
+            define.merge(1, function(parameters, plugin) {
+                expect(parameters).to.eql(define.get().parameters);
+                expect(plugin).to.eq(define);
+
+                return parameters[1];
+            });
+        });
+
+        it("throws if 'changes' doesn't return an object or array, given a function", function() {
+            var error = "You must provide either an object or array for 'changes'.";
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "object" || type == "array")
+                    return;
+
+                expect(function() {
+                    plugin.merge(function() {
+                        return types[type];
+                    });
+                }).to.throw(error);
+            });
+        });
+
+        it("merges a parameter at a specific index, given an 'index' integer", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            plugin.merge(2, {b: 2});
+
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, {b: 2}]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("throws if 'index' isn't an integer", function() {
+            var error = "You must provide an integer for 'index'.";
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "int")
+                    return;
+
+                expect(function() {
+                    plugin.merge(types[type], {});
+                }).to.throw(error);
+            });
+        });
+
+    });
+
+    describe("set", function() {
+
+        it("overwrites parameters, given an array for 'changes'", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            plugin.set([{b: 2}]);
+
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{b: 2}, 5, "test"]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("overwrites parameters at specific indexes, given a 'changes' object with numerical keys", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            plugin.set({
+                0: {b: 2},
+                2: "changed"
+            });
+
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{b: 2}, 5, "changed"]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("throws if a 'changes' object is passed with non-numerical keys", function() {
+            var error = "You must provide numerical keys when defining 'changes' as an object.";
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "int")
+                    return;
+
+                var key = types[type];
+                var changes = {};
+
+                changes[key] = "test";
+
+                expect(function() {
+                    plugin.set(changes);
+                }).to.throw(error);
+            });
+        });
+
+        it("throws if 'changes' isn't an object or array", function() {
+            var error = "You must provide either an object or array for 'changes'.";
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "object" || type == "array")
+                    return;
+
+                expect(function() {
+                    plugin.set(types[type]);
+                }).to.throw(error);
+            });
+        });
+
+        it("accepts a function who's return value is merged with the plugin's parameters", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            plugin.set(function(parameters) {
+                return [{b: 2}, 3, "changed"];
+            });
+
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{b: 2}, 3, "changed"]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("provides a reference to the current parameters and plugin, given a function", function() {
+            var define = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            // Call the set method with just 'changes'.
+            define.set(function(parameters, plugin) {
+                expect(parameters).to.eql(define.get().parameters);
+                expect(plugin).to.eq(define);
+
+                return parameters;
+            });
+
+            // Call the set method with 'index' and 'changes'.
+            define.set(1, function(parameters, plugin) {
+                expect(parameters).to.eql(define.get().parameters);
+                expect(plugin).to.eq(define);
+
+                return parameters[1];
+            });
+        });
+
+        it("throws if 'changes' doesn't return an object or array, given a function", function() {
+            var error = "You must provide either an object or array for 'changes'.";
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "object" || type == "array")
+                    return;
+
+                expect(function() {
+                    plugin.set(function() {
+                        return types[type];
+                    });
+                }).to.throw(error);
+            });
+        });
+
+        it("overwrites a parameter at a specific index, given an 'index' integer", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            plugin.set(2, "changed");
+
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "changed"]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("throws if 'index' isn't an integer", function() {
+            var error = "You must provide an integer for 'index'.";
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "int")
+                    return;
+
+                expect(function() {
+                    plugin.set(types[type], {});
+                }).to.throw(error);
+            });
+        });
+
+    });
+
+    describe("get", function() {
+
+        it("returns a clone of the internal plugin config", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            });
+            var state = plugin.get();
+
+            // Mutate the state.
+            // If we simply return the internal reference,
+            // it will effect the next call to plugin.get().
+            state.plugin = Webpack.optimize.UglifyJsPlugin;
+
+            var actual = plugin.get();
+            var expected = {
+                plugin: Webpack.DefinePlugin,
+                parameters: [{a: 1}, 5, "test"]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+    });
+
+    describe("resolve", function() {
+
+        it("returns an instance of 'plugin'", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin
+            });
+
+            var actual = plugin.resolve();
+            var expected = new Webpack.DefinePlugin();
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("applies 'parameters' upon initialisation", function() {
+            var plugin = Config.plugin({
+                plugin: Webpack.DefinePlugin,
+                parameters: [{
+                    VERSION: JSON.stringify("5fa3b9"),
+                    BROWSER_SUPPORTS_HTML5: true,
+                    TWO: "1+1"
+                }]
+            });
+
+            var actual = plugin.resolve();
+            var expected = new Webpack.DefinePlugin({
+                VERSION: JSON.stringify("5fa3b9"),
+                BROWSER_SUPPORTS_HTML5: true,
+                TWO: "1+1"
+            });
+
+            expect(actual).to.eql(expected);
+        });
     });
 
 });

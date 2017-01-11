@@ -1,217 +1,686 @@
-var expect = require("chai").expect;
+var Chai = require("chai");
+var Sinon = require("sinon");
+var Types = require("./helpers/types");
 var Config = require("../");
 
-describe("loader", function() {
+var expect = Chai.expect;
+var types = Types();
+
+describe("Loader:", function() {
 
     beforeEach(function() {
-        this.config = new Config();
+        this.sandbox = Sinon.sandbox.create();
     });
 
-    it("should require a name (that's a string) to enable referencing when merging", function() {
-        var config = this.config;
-        var invalid = [5, function() {}, [], null, undefined, {}];
+    afterEach(function() {
+        this.sandbox.restore();
+    });
 
-        invalid.forEach(function(invalidParameter) {
+    // TODO: Specs for validation type checks.
+    describe("merge", function() {
+
+        it("returns the loader object to allow chaining", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            var actual = loader.merge({});
+            var expected = loader;
+
+            expect(actual).to.eq(expected);
+        });
+
+        it("throws if no arguments are passed", function() {
+            var error = "You must provide either an object or function value for 'changes'.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
             expect(function() {
-                config.loader(invalidParameter);
-            }).to.throw("Invalid 'name' parameter. You must provide a string.");
-        });
-        
-        expect(function() {
-            config.loader("my-loader", {});
-        }).to.not.throw();
-    });
-
-    it("should accept a config parameter that's an object, function, or null", function() {
-        var config = this.config;
-        var valid = [{}, function() {}, null];
-        var invalid = ["", [], true, false, 5, undefined];
-        
-        valid.forEach(function(validParameter) {
-            expect(function() {
-                config.loader("my-loader", validParameter);
-            }).not.to.throw();
-        });
-        
-        invalid.forEach(function(invalidParameter) {
-            expect(function() {
-                config.loader("my-loader", invalidParameter);
-            }).to.throw("Invalid 'config' parameter. You must provide either an object, function, or null.");
-        });
-    });
-
-    it("should, when resolving, create a module.loaders array if not already created", function() {
-        var resolved;
-        
-        this.config.loader("my-loader", {
-            test: /\.myldr/
+                loader.merge();
+            }).to.throw(error);
         });
 
-        resolved = this.config.resolve();
-        
-        expect(resolved).to.have.property("module");
-        expect(resolved.module).to.have.property("loaders");
-        expect(resolved.module.loaders).to.be.an.instanceof(Array);
-        expect(resolved.module.loaders[0]).to.be.an.instanceof(Object);
-    });
-
-    it("should use the value of 'name' for the 'loader' property when resolving if no loader is defined", function() {
-        var loaders;
-
-        this.config.loader("my-loader", {
-            test: /\.myldr/
-        });
-
-        loaders = this.config.resolve().module.loaders;
-
-        expect(loaders[0]).to.have.property("loader", "my-loader");
-    });
-    
-    it("should not assign the 'loader' property if a 'loader' property already exists", function() {
-        var loaders;
-
-        // This should cancel out the auto 'loader' assign.
-        this.config.loader("my-loader", {
-            test: /\.myldr/,
-            loader: "some-other-loader"
-        });
-
-        loaders = this.config.resolve().module.loaders;
-
-        expect(loaders[0].loader).to.eq("some-other-loader");
-    });
-
-    it("should not assign the 'loader' property if a 'loaders' property already exists", function() {
-        var loaders;
-
-        // This should cancel out the auto 'loader' assign.
-        this.config.loader("my-loader", {
-            test: /\.myldr/,
-            loaders: ["my-loader", "some-other-loader"]
-        });
-
-        loaders = this.config.resolve().module.loaders;
-
-        expect(loaders[0]).to.not.have.property("loader");
-    });
-
-    it("should enable function chaining by returning the config instance", function() {
-        var config = this.config.loader("my-loader", {});
-
-        // Reference equality.
-        expect(config).to.eq(this.config);
-    });
-    
-    describe("examples (using objects)", function() {
-
-        it("should successfully create a simple loader", function() {
-            this.config.loader("babel", {
-                test: /\.jsx?$/,
-                exclude: /node_modules/,
+        it("accepts an object to merge with the current loader config", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
                 query: {
-                    optional: ["runtime"],
-                    stage: 2
+                    presets: ["es2015"]
                 }
             });
 
-            expect(this.config.resolve()).to.eql({
-                module: {
-                    loaders: [
-                        {
-                            test: /\.jsx?$/,
-                            exclude: /node_modules/,
-                            loader: "babel",
-                            query: {
-                                optional: ["runtime"],
-                                stage: 2
-                            }
-                        }
-                    ]
+            // Perform the merge.
+            loader.merge({
+                query: {
+                    plugins: ["transform-runtime"]
                 }
             });
-            
-        });
-        
-        it("should successfully merge configurations for loaders with the same name", function() {
-             this.config
-                .loader("babel", {
-                    test: /\.jsx?$/,
-                    exclude: /node_modules/,
-                    query: {
-                        optional: ["runtime"],
-                        stage: 2
-                    }
-                })
-                .loader("babel", {
-                    query: {
-                        optional: ["es7.classProperties"]
-                    }
-                });
 
-            expect(this.config.resolve()).to.eql({
-                module: {
-                    loaders: [
-                        {
-                            test: /\.jsx?$/,
-                            exclude: /node_modules/,
-                            loader: "babel",
-                            query: {
-                                optional: ["runtime", "es7.classProperties"],
-                                stage: 2
-                            }
-                        }
-                    ]
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    plugins: ["transform-runtime"],
+                    presets: ["es2015"]
                 }
-            });
-            
+            };
+
+            expect(actual).to.eql(expected);
         });
 
-        it("should support the ExtractText plugin that wraps the value of the 'loader' property", function() {
-            var ExtractTextPlugin = require("extract-text-webpack-plugin");
+        it("accepts a function who's return value is merged with the current loader config", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
 
-            function extractTextResolver(config) {
-                // Build up a loader string.
-                var loaders = config.loaders.map(function(loader) {
-                    return loader.name + "?" + JSON.stringify(loader.query);
-                });
-                
-                config.loader = ExtractTextPlugin.extract(loaders.join("!"));
-                
-                // Clean up before resolving.
-                delete config.loaders;
+            // Perform the merge.
+            loader.merge(function(config) {
+                var presets = config.query.presets;
 
-                // Return the correctly resolved sass-loader configuration.
+                return {
+                    query: {
+                        presets: presets.concat("react")
+                    }
+                };
+            });
+
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015", "react"]
+                }
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("provides a reference to the current config and loader, given a function", function() {
+            var concatMerge = Config.helpers.concatMerge;
+            var babel = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            // Call the merge method with just 'changes'.
+            babel.merge(function(config, loader) {
+                expect(config).to.eql(babel.get());
+                expect(loader).to.eq(babel);
+
                 return config;
-            }
-            
-            this.config.loader("sass", {
-                test: /\.scss$/,
-                exclude: /node_modules/,
-                loaders: [
-                    {
-                        name: "css",
-                        query: {}
-                    },
-                    {
-                        name: "sass",
-                        query: {}
-                    }
-                ]
-            }, extractTextResolver);
+            });
 
-            expect(this.config.resolve()).to.eql({
-                module: {
-                    loaders: [
-                        {
-                            test: /\.scss$/,
-                            exclude: /node_modules/,
-                            loader: ExtractTextPlugin.extract("css?{}!sass?{}")
-                        }
-                    ]
-                }
+            // Call the merge method with 'property' and 'changes'.
+            // TODO: Not yet supported.
+            // babel.merge("query", function(config, loader) {
+            //     expect(config).to.eql(babel.get());
+            //     expect(loader).to.eq(babel);
+            //
+            //     return config.query;
+            // });
+
+            // Call the merge method with 'changes' and 'customizer'.
+            babel.merge(function(config, loader) {
+                expect(config).to.eql(babel.get());
+                expect(loader).to.eq(babel);
+
+                return config;
+            }, concatMerge);
+
+            // Call the merge method with 'property', 'changes', and 'customizer'.
+            babel.merge("query", function(config, loader) {
+                expect(config).to.eql(babel.get());
+                expect(loader).to.eq(babel);
+
+                return config.query;
+            }, concatMerge);
+        });
+
+        it("throws if 'changes' doesn't return an object, given a function", function() {
+            var error = "You must provide an object or function (that returns an object) for 'changes'.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "object")
+                    return;
+
+                expect(function() {
+                    loader.merge(function() {
+                        return types[type];
+                    });
+                }).to.throw(error);
             });
         });
-        
+
+        // TODO: find a way to reuse the code from within main.spec.js to ensure this mirrors the same validation.
+        xit("throws if 'changes' is an object but contains invalid properties", function() {
+
+        });
+
+        xit("throws if 'changes' is an invalid type, given a valid 'property' value", function() {
+
+        });
+
+        it("accepts a property string to allow direct merging on top-level properties", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            // Perform the merge.
+            loader.merge("query", {
+                presets: ["es2015", "react"]
+            });
+
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015", "react"]
+                }
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("throws if 'property' isn't a string", function() {
+            var error = "You must provide a string value for 'property'.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "string")
+                    return;
+
+                expect(function() {
+                    loader.merge(types[type], {});
+                }).to.throw(error);
+            });
+        });
+
+        it("accepts a customizer function as a second parameter for tweaking merge behaviour", function() {
+            var concatMerge = Config.helpers.concatMerge;
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            // Perform the merge.
+            loader.merge({
+                query: {
+                    presets: ["react"]
+                }
+            }, concatMerge);
+
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015", "react"]
+                }
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("accepts a customizer function as a third parameter for tweaking merge behaviour", function() {
+            var concatMerge = Config.helpers.concatMerge;
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            // Perform the merge.
+            loader.merge("query", {
+                presets: ["react"]
+            }, concatMerge);
+
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015", "react"]
+                }
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        // TODO: Test when 'customizer' is used as the second parameter.
+        it("throws if 'customizer' isn't a function", function() {
+            var error = "You must provide a function for 'customizer'.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "func")
+                    return;
+
+                expect(function() {
+                    loader.merge("query", {}, types[type]);
+                }).to.throw(error);
+            });
+        });
+
     });
-        
+
+    describe("set", function() {
+
+        it("returns the loader object to allow chaining", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            var actual = loader.set({});
+            var expected = loader;
+
+            expect(actual).to.eq(expected);
+        });
+
+        it("throws if no arguments are passed", function() {
+            var error = "You must provide either an object or function value for 'changes'.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            expect(function() {
+                loader.set();
+            }).to.throw(error);
+
+        });
+
+        it("accepts an object that overwrites top-level properties", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            // Perform the overwrite.
+            loader.set({
+                query: {
+                    plugins: ["transform-runtime"]
+                }
+            });
+
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    plugins: ["transform-runtime"]
+                }
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("accepts a function who's return value overwrites top-level properties", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            // Perform the overwrite.
+            loader.set(function() {
+                return {
+                    query: {
+                        plugins: ["transform-runtime"]
+                    }
+                };
+            });
+
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    plugins: ["transform-runtime"]
+                }
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("provides a reference to the current config and loader, given a function", function() {
+            var babel = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            // Call the set method with just 'changes'.
+            babel.set(function(config, loader) {
+                expect(config).to.eql(babel.get());
+                expect(loader).to.eq(babel);
+
+                return config;
+            });
+
+            // Call the set method with 'property' and 'changes'.
+            babel.set("query", function(config, loader) {
+                expect(config).to.eql(babel.get());
+                expect(loader).to.eq(babel);
+
+                return config.query;
+            });
+        });
+
+        it("throws if 'changes' doesn't return an object, given a function", function() {
+            var error = "You must provide an object or function (that returns an object) for 'changes'.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "object")
+                    return;
+
+                expect(function() {
+                    loader.set(function() {
+                        return types[type];
+                    });
+                }).to.throw(error);
+            });
+        });
+
+        // TODO: find a way to reuse the code from within main.spec.js to ensure this mirrors the same validation.
+        xit("throws if 'changes' is an object but contains invalid properties", function() {
+
+        });
+
+        xit("throws if 'changes' is an invalid type, given a valid 'property' value", function() {
+
+        });
+
+        it("accepts a property string to allow direct overwrites on top-level properties", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            // Perform the overwrite.
+            loader.set("query", {
+                plugins: ["transform-runtime"]
+            });
+
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    plugins: ["transform-runtime"]
+                }
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("throws if 'property' isn't a string", function() {
+            var error = "You must provide a string value for 'property'.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+
+            Object.keys(types).forEach(function(type) {
+                if (type == "string")
+                    return;
+
+                expect(function() {
+                    loader.set(types[type], {});
+                }).to.throw(error);
+            });
+        });
+
+    });
+
+    describe("get", function() {
+
+        it("returns a clone of the internal loader config", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+            var state = loader.get();
+
+            // Mutate the state.
+            // If we simply return the internal reference,
+            // it will effect the next call to loader.get().
+            state.loader = "test";
+
+            var actual = loader.get();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel"
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+    });
+
+    describe("resolve", function() {
+
+        it("returns a clone of the internal loader config", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel"
+            });
+            var state = loader.resolve();
+
+            // Mutate the state.
+            // If we simply return the internal reference,
+            // it will effect the next call to loader.resolve().
+            state.loader = "test";
+
+            var actual = loader.resolve();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel"
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("stringifies 'query' and appends the value onto 'loader'", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            var actual = loader.resolve();
+            var expected = {
+                test: /\.jsx?/,
+                loader: 'babel?{"presets":["es2015"]}'
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("stringifies and appends the respective query in 'queries' to 'loader'", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                queries: {
+                    babel: {presets: ["es2015"]}
+                }
+            });
+
+            var actual = loader.resolve();
+            var expected = {
+                test: /\.jsx?/,
+                loader: 'babel?{"presets":["es2015"]}'
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("maps over each loader in 'loaders' and stringifies the respective query in 'queries'", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loaders: ["babel", "test"],
+                queries: {
+                    babel: {presets: ["es2015"]},
+                    test: {param: 5}
+                }
+            });
+
+            var actual = loader.resolve();
+            var expected = {
+                test: /\.jsx?/,
+                loaders:[
+                    'babel?{"presets":["es2015"]}',
+                    'test?{"param":5}'
+                ]
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+        it("throws if neither 'loader' or 'loaders' is present within the config", function() {
+            var error = "A loader must have either a 'loader' or 'loaders' property to be resolved.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                query: {
+                    presets: ["es2015"]
+                }
+            });
+
+            expect(function() {
+                loader.resolve();
+            }).to.throw(error);
+        });
+
+        // TODO: Maybe this should simply warn? How can the user turn these warnings off?
+        xit("throws if 'queries' contains a top-level property isn't in 'loader'", function() {
+            var error = "Failed to map 'test' to a matching loader. Found 'babel'.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                queries: {
+                    test: {
+                        param: 5
+                    }
+                }
+            });
+
+            expect(function() {
+                loader.resolve();
+            }).to.throw(error);
+        });
+
+        // TODO: Maybe this should simply warn? How can the user turn these warnings off?
+        xit("throws if 'queries' contains a top-level property isn't in 'loaders'", function() {
+            var error = "Failed to map 'test' to a matching loader. Found 'style', 'css', 'sass'.";
+            var loader = Config.loader({
+                test: /\.scss/,
+                loaders: ["style", "css", "sass"],
+                queries: {
+                    sass: {sourceMap: true},
+                    css: {sourceMap: true},
+                    test: {param: 5}
+                }
+            });
+
+            expect(function() {
+                loader.resolve();
+            }).to.throw(error);
+        });
+
+        it("throws if both 'queries' and 'query' are defined", function() {
+            var error = "You cannot define 'query' and 'queries' together in a loader configuration.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                query: {
+                    presets: ["es2015", "react"]
+                },
+                queries: {
+                    babel: {
+                        plugins: ["transform-runtime"]
+                    }
+                }
+            });
+
+            expect(function() {
+                loader.resolve();
+            }).to.throw(error);
+        });
+
+        it("throws if both 'loader' and 'loaders' are defined", function() {
+            var error = "You cannot define 'loader' and 'loaders' together in a loader configuration.";
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                loaders: ["test"]
+            });
+
+            expect(function() {
+                loader.resolve();
+            }).to.throw(error);
+        });
+
+        it("only returns the properties: 'test', 'exclude', 'include', 'loader', and 'loaders'", function() {
+            var loader = Config.loader({
+                test: /\.jsx?/,
+                loader: "babel",
+                ignoredProperty: "test"
+            });
+
+            var actual = loader.resolve();
+            var expected = {
+                test: /\.jsx?/,
+                loader: "babel"
+            };
+
+            expect(actual).to.eql(expected);
+        });
+
+    });
+
 });
