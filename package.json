@@ -21,15 +21,15 @@
   },
   "license": "MIT",
   "dependencies": {
-    "lodash.clonedeepwith": "4.3.2",
-    "lodash.isplainobject": "4.0.4",
-    "lodash.mergewith": "4.1.0"
+    "lodash.clonedeepwith": "4.5.0",
+    "lodash.isplainobject": "4.0.6",
+    "lodash.mergewith": "4.6.0"
   },
   "devDependencies": {
     "chai": "3.5.0",
     "extract-text-webpack-plugin": "1.0.1",
-    "mocha": "2.4.5",
-    "rewire": "2.5.1",
-    "sinon": "1.17.3"
+    "mocha": "3.2.0",
+    "rewire": "2.5.2",
+    "sinon": "1.17.7"
   }
 }
